@@ -20,6 +20,7 @@ const routeTitles: Record<string, string> = {
   "/dashboard/composer": "Post Composer",
   "/dashboard/calendar": "Content Calendar",
   "/accounts": "Connected Accounts",
+  "/admin/queues": "Queue Monitor",
   "/dashboard/auto-reply": "Auto-Reply Rules",
   "/dashboard/analytics": "Analytics Insights",
   "/dashboard/billing": "Billing & Subscriptions",

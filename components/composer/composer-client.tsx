@@ -458,6 +458,49 @@ export function ComposerClient({
       return;
     }
 
+    // Platform-specific validation enforcements (only for publishing/scheduling, not drafts)
+    if (submitStatus !== "draft") {
+      for (const account of activeConnectedAccounts) {
+        const platform = account.platform;
+        const details = PLATFORM_DETAILS[platform];
+
+        if (details) {
+          // 1. Character Limit Validation
+          if (content.length > details.limit) {
+            toast.error(
+              `${details.name} character limit exceeded: ${content.length}/${details.limit} characters.`
+            );
+            return;
+          }
+
+          // 2. Media Constraint Validations
+          const hasImages = uploadedFiles.some((f) => f.type === "image");
+          const hasVideos = uploadedFiles.some((f) => f.type === "video");
+          const totalMedia = uploadedFiles.length;
+
+          if (platform === "instagram" && totalMedia === 0) {
+            toast.error("Instagram requires at least one image or video. Text-only posts are not supported.");
+            return;
+          }
+
+          if (platform === "pinterest" && totalMedia === 0) {
+            toast.error("Pinterest requires at least one image or video. Text-only posts are not supported.");
+            return;
+          }
+
+          if (platform === "youtube" && !hasVideos) {
+            toast.error("YouTube only supports video posts. Please attach a video file.");
+            return;
+          }
+
+          if (platform === "tiktok" && !hasVideos) {
+            toast.error("TikTok only supports video posts. Please attach a video file.");
+            return;
+          }
+        }
+      }
+    }
+
     // Check month limits for Free users
     if (
       submitStatus !== "draft" &&
