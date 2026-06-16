@@ -154,7 +154,10 @@ export const publisherWorker = new Worker<PublishPostJobData>(
           });
           
           if (user && user.emailOnFailure && user.email) {
-            await sendFailureEmail(user.email, post.content, targetErrors);
+            const emailSent = await sendFailureEmail(user.email, post.content, targetErrors);
+            if (!emailSent) {
+              console.error(`[Publisher Worker] sendFailureEmail returned false; alert email was not successfully sent to user ${user.email}`);
+            }
           }
         } catch (emailErr) {
           console.error(`[Publisher Worker] Failed to send publication failure email alert:`, emailErr);

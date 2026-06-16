@@ -3,6 +3,15 @@
  * avoiding extra third-party SDK dependencies in Next.js serverless route/worker contexts.
  */
 
+function redactEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain) return "***";
+  const maskedLocal = local.length > 2 
+    ? `${local[0]}***${local[local.length - 1]}` 
+    : "***";
+  return `${maskedLocal}@${domain}`;
+}
+
 export async function sendFailureEmail(
   toAddress: string,
   postContent: string,
@@ -31,11 +40,20 @@ Best regards,
 The Social Copilot Team
 https://socialcopilot.dev`;
 
-  console.log(`[Email Client] Dispatching alert email to: ${toAddress}`);
+  const isDevOrTest = process.env.NODE_ENV !== "production";
+  const maskedEmail = redactEmail(toAddress);
+
+  console.log(`[Email Client] Dispatching alert email to: ${maskedEmail}`);
   console.log(`[Email Client] Subject: ${subject}`);
-  console.log(`[Email Client] Body:\n${bodyText}`);
+  if (isDevOrTest) {
+    console.log(`[Email Client] Body:\n${bodyText}`);
+  }
 
   if (!apiKey || apiKey === "replace_me") {
+    if (process.env.NODE_ENV === "production") {
+      console.error("[Email Client] Missing RESEND_API_KEY in production environment. Email delivery failed.");
+      return false;
+    }
     console.log("[Email Client] No RESEND_API_KEY set. Simulated email delivery complete (logged above).");
     return true;
   }
@@ -61,7 +79,7 @@ https://socialcopilot.dev`;
       return false;
     }
 
-    console.log(`[Email Client] Email successfully sent to ${toAddress} via Resend.`);
+    console.log(`[Email Client] Email successfully sent to ${maskedEmail} via Resend.`);
     return true;
   } catch (error) {
     console.error("[Email Client] Failed to deliver email via Resend:", error);

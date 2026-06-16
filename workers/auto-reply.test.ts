@@ -25,7 +25,7 @@ function evaluateTrigger(
       (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
     );
     const earliestComment = sortedComments[0];
-    return earliestComment && earliestComment.id === comment.id;
+    return !!(earliestComment && earliestComment.id === comment.id);
   }
   return false;
 }

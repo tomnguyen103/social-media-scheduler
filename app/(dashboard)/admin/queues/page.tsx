@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 type JobInfo = {
   id: string;
   name: string;
-  data: any;
+  data: unknown;
   failedReason?: string;
   finishedOn?: string | null;
   processedOn?: string | null;
@@ -114,7 +114,8 @@ export default function QueueMonitorPage() {
   }, [autoRefresh, fetchMetrics]);
 
   const handleRetryJob = async (queueName: string, jobId: string) => {
-    setActionInProgress(jobId);
+    const actionKey = `${queueName}:${jobId}`;
+    setActionInProgress(actionKey);
     try {
       const res = await fetch("/api/admin/queues", {
         method: "POST",
@@ -129,15 +130,17 @@ export default function QueueMonitorPage() {
 
       toast.success(`Job successfully retried on queue: ${queueName}`);
       fetchMetrics(true);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to retry job.");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to retry job.";
+      toast.error(message);
     } finally {
       setActionInProgress(null);
     }
   };
 
   const handleRetryDLQ = async (jobId: string, postId: string) => {
-    setActionInProgress(jobId);
+    const actionKey = `dlq:${jobId}`;
+    setActionInProgress(actionKey);
     try {
       const res = await fetch("/api/admin/queues", {
         method: "POST",
@@ -152,8 +155,9 @@ export default function QueueMonitorPage() {
 
       toast.success(`Post successfully recovered and queued for publishing!`);
       fetchMetrics(true);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to retry DLQ post.");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to retry DLQ post.";
+      toast.error(message);
     } finally {
       setActionInProgress(null);
     }
@@ -315,7 +319,7 @@ export default function QueueMonitorPage() {
                       ) : (
                         data.queues.flatMap((q) => 
                           q.active.map((job) => (
-                            <TableRow key={job.id}>
+                            <TableRow key={`${q.name}:${job.id}`}>
                               <TableCell className="font-semibold text-xs px-4">{formatQueueName(q.name)}</TableCell>
                               <TableCell className="font-mono text-[11px] text-muted-foreground px-4">{job.id}</TableCell>
                               <TableCell className="text-xs text-muted-foreground px-4 truncate max-w-[200px]">
@@ -357,7 +361,7 @@ export default function QueueMonitorPage() {
                       ) : (
                         data.queues.flatMap((q) => 
                           q.failed.map((job) => (
-                            <TableRow key={job.id}>
+                            <TableRow key={`${q.name}:${job.id}`}>
                               <TableCell className="font-semibold text-xs px-4">{formatQueueName(q.name)}</TableCell>
                               <TableCell className="text-xs text-destructive px-4 max-w-[180px] truncate" title={job.failedReason}>
                                 {job.failedReason || "Unknown failure."}
@@ -367,10 +371,10 @@ export default function QueueMonitorPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleRetryJob(q.name, job.id)}
-                                  disabled={actionInProgress === job.id}
+                                  disabled={actionInProgress === `${q.name}:${job.id}`}
                                   className="h-8 rounded-lg text-primary text-xs hover:text-primary hover:bg-primary/5 font-semibold"
                                 >
-                                  <RotateCcw className={`size-3.5 mr-1 ${actionInProgress === job.id ? "animate-spin" : ""}`} />
+                                  <RotateCcw className={`size-3.5 mr-1 ${actionInProgress === `${q.name}:${job.id}` ? "animate-spin" : ""}`} />
                                   Retry
                                 </Button>
                               </TableCell>
@@ -424,7 +428,7 @@ export default function QueueMonitorPage() {
                         <>
                           {/* Active */}
                           {q.active.map((job) => (
-                            <TableRow key={job.id}>
+                            <TableRow key={`${q.name}:${job.id}`}>
                               <TableCell className="font-mono text-[11px] px-4">{job.id}</TableCell>
                               <TableCell className="text-xs text-muted-foreground px-4 truncate max-w-[250px]">
                                 {JSON.stringify(job.data)}
@@ -438,7 +442,7 @@ export default function QueueMonitorPage() {
                           
                           {/* Delayed */}
                           {q.delayed.map((job) => (
-                            <TableRow key={job.id}>
+                            <TableRow key={`${q.name}:${job.id}`}>
                               <TableCell className="font-mono text-[11px] px-4">{job.id}</TableCell>
                               <TableCell className="text-xs text-muted-foreground px-4 truncate max-w-[250px]">
                                 {JSON.stringify(job.data)}
@@ -454,7 +458,7 @@ export default function QueueMonitorPage() {
 
                           {/* Failed */}
                           {q.failed.map((job) => (
-                            <TableRow key={job.id} className="bg-destructive/5 hover:bg-destructive/10 transition-colors">
+                            <TableRow key={`${q.name}:${job.id}`} className="bg-destructive/5 hover:bg-destructive/10 transition-colors">
                               <TableCell className="font-mono text-[11px] px-4">{job.id}</TableCell>
                               <TableCell className="text-xs text-muted-foreground px-4 truncate max-w-[250px]">
                                 {JSON.stringify(job.data)}
@@ -467,10 +471,10 @@ export default function QueueMonitorPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleRetryJob(q.name, job.id)}
-                                  disabled={actionInProgress === job.id}
+                                  disabled={actionInProgress === `${q.name}:${job.id}`}
                                   className="h-8 rounded-lg text-primary text-xs hover:text-primary hover:bg-primary/5 font-semibold"
                                 >
-                                  <RotateCcw className={`size-3.5 mr-1 ${actionInProgress === job.id ? "animate-spin" : ""}`} />
+                                  <RotateCcw className={`size-3.5 mr-1 ${actionInProgress === `${q.name}:${job.id}` ? "animate-spin" : ""}`} />
                                   Retry
                                 </Button>
                               </TableCell>
@@ -521,7 +525,7 @@ export default function QueueMonitorPage() {
                       </TableRow>
                     ) : (
                       data.dlq.jobs.map((job) => (
-                        <TableRow key={job.id} className="hover:bg-muted/30">
+                        <TableRow key={`dlq:${job.id}`} className="hover:bg-muted/30">
                           <TableCell className="font-mono text-xs px-4 text-foreground font-semibold">
                             {job.data.postId}
                           </TableCell>
@@ -556,10 +560,10 @@ export default function QueueMonitorPage() {
                               variant="default"
                               size="sm"
                               onClick={() => handleRetryDLQ(job.id, job.data.postId)}
-                              disabled={actionInProgress === job.id}
+                              disabled={actionInProgress === `dlq:${job.id}`}
                               className="h-8 rounded-lg bg-primary text-xs hover:brightness-105 font-semibold text-primary-foreground"
                             >
-                              <Play className={`size-3.5 mr-1 ${actionInProgress === job.id ? "animate-spin" : ""}`} />
+                              <Play className={`size-3.5 mr-1 ${actionInProgress === `dlq:${job.id}` ? "animate-spin" : ""}`} />
                               Retry & Publish
                             </Button>
                           </TableCell>

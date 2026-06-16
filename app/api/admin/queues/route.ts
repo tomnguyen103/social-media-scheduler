@@ -9,17 +9,30 @@ import {
 } from "@/lib/bullmq/queues";
 
 export async function GET() {
-  const { userId } = await auth();
+  const { userId, sessionClaims } = await auth();
   if (!userId) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  // Check if user is admin or if we are in development mode
+  const claims = sessionClaims as unknown as {
+    metadata?: { role?: string };
+    publicMetadata?: { role?: string };
+  };
+  const role = claims?.metadata?.role || claims?.publicMetadata?.role;
+  const isDev = process.env.NODE_ENV === "development";
+
+  if (role !== "admin" && !isDev) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
+  let dlqQueue: Queue | null = null;
   try {
     const queues = getQueues();
     const connection = getRedisConnectionOptions();
     
     // Instantiate reference to the Dead Letter Queue
-    const dlqQueue = new Queue("post-publisher-dlq", { connection });
+    dlqQueue = new Queue("post-publisher-dlq", { connection });
 
     const queueDetails = await Promise.all(
       Object.entries(queues).map(async ([name, queue]) => {
@@ -76,15 +89,32 @@ export async function GET() {
   } catch (error) {
     console.error("[Queue Admin API] Failed to fetch queue statuses:", error);
     return NextResponse.json({ error: "Failed to load queue metrics." }, { status: 500 });
+  } finally {
+    if (dlqQueue) {
+      await dlqQueue.close();
+    }
   }
 }
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const { userId, sessionClaims } = await auth();
   if (!userId) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  // Check if user is admin or if we are in development mode
+  const claims = sessionClaims as unknown as {
+    metadata?: { role?: string };
+    publicMetadata?: { role?: string };
+  };
+  const role = claims?.metadata?.role || claims?.publicMetadata?.role;
+  const isDev = process.env.NODE_ENV === "development";
+
+  if (role !== "admin" && !isDev) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
+  let dlqQueue: Queue | null = null;
   try {
     const { action, queueName, jobId } = await request.json();
 
@@ -107,7 +137,7 @@ export async function POST(request: Request) {
 
     if (action === "retry-dlq") {
       const connection = getRedisConnectionOptions();
-      const dlqQueue = new Queue("post-publisher-dlq", { connection });
+      dlqQueue = new Queue("post-publisher-dlq", { connection });
       const job = await dlqQueue.getJob(jobId);
 
       if (!job) {
@@ -121,7 +151,11 @@ export async function POST(request: Request) {
 
       // Re-add post publishing payload back to post-publisher queue
       const publisherQueue = getPostPublisherQueue();
-      await publisherQueue.add("publishPost", { postId });
+      await publisherQueue.add(
+        "publishPost",
+        { postId },
+        { jobId: `dlq-retry:${postId}` }
+      );
 
       // Remove from DLQ
       await job.remove();
@@ -134,5 +168,9 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[Queue Admin API] Execution failed:", error);
     return NextResponse.json({ error: "Action execution failed." }, { status: 500 });
+  } finally {
+    if (dlqQueue) {
+      await dlqQueue.close();
+    }
   }
 }
