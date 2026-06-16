@@ -5,6 +5,7 @@ import { getRedisConnectionOptions, queueNames, type PublishPostJobData } from "
 import { getDb } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { publishToPlatform, type SupportedPlatform } from "@/lib/platforms";
+import { sendFailureEmail } from "@/lib/email/client";
 
 // Create Dead Letter Queue (DLQ)
 const dlqQueue = new Queue("post-publisher-dlq", {
@@ -145,6 +146,22 @@ export const publisherWorker = new Worker<PublishPostJobData>(
         });
 
         console.log(`[Publisher Worker] Post ${postId} permanently failed with status '${finalPostStatus}'. DLQ updated.`);
+
+        // Phase 2: Dispatch failure notification email if user settings allow it
+        try {
+          const user = await db.query.users.findFirst({
+            where: eq(schema.users.clerkUserId, post.clerkUserId),
+          });
+          
+          if (user && user.emailOnFailure && user.email) {
+            const emailSent = await sendFailureEmail(user.email, post.content, targetErrors);
+            if (!emailSent) {
+              console.error(`[Publisher Worker] sendFailureEmail returned false; alert email was not successfully sent to user ${user.email}`);
+            }
+          }
+        } catch (emailErr) {
+          console.error(`[Publisher Worker] Failed to send publication failure email alert:`, emailErr);
+        }
       }
     } else {
       // All targets published successfully
