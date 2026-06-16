@@ -84,7 +84,7 @@ graph TD
 
 The project directory structure follows Next.js App Router conventions and clean division of concerns:
 
-```
+```txt
 social-media-scheduler/
 ├── app/
 │   ├── (landing)/           # Public landing and marketing screens
