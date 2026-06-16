@@ -148,7 +148,7 @@ export function AnalyticsClient() {
           <EmptyHeader>
             <EmptyTitle className="text-foreground">No Analytics Data Yet</EmptyTitle>
             <EmptyDescription className="text-xs max-w-sm">
-              We'll start tracking reach, impressions, likes, and comment engagement as soon as you publish your first post.
+              We&apos;ll start tracking reach, impressions, likes, and comment engagement as soon as you publish your first post.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
